@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class PreviousStarterScreen extends StatefulWidget {
-  const PreviousStarterScreen({super.key});
+class FirstStarterScreen extends StatefulWidget {
+  const FirstStarterScreen({super.key});
 
   @override
-  State<PreviousStarterScreen> createState() => _PreviousStarterScreenState();
+  State<FirstStarterScreen> createState() => _FirstStarterScreenState();
 }
 
-class _PreviousStarterScreenState extends State<PreviousStarterScreen> with SingleTickerProviderStateMixin {
+class _FirstStarterScreenState extends State<FirstStarterScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _centerCircleAnimation;
   late Animation<double> _middleCircleAnimation;

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 class StarterScreen extends StatefulWidget {
   const StarterScreen({super.key});
@@ -10,24 +9,43 @@ class StarterScreen extends StatefulWidget {
 
 class _StarterScreenState extends State<StarterScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  List<double> _waveRadiuses = []; // Pour stocker plusieurs vagues
-  final int _waveCount = 3; // Nombre de vagues
-  final double _waveInterval = 0.33; // Intervalle entre les vagues
+  late Animation<double> _centerCircleAnimation;
+  late Animation<double> _middleCircleAnimation;
+  late Animation<double> _outerCircleAnimation;
 
   @override
   void initState() {
     super.initState();
     
-    // Configuration de l'animation avec une durée plus longue
+    // Configuration de l'animation
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 5000), // Durée plus longue pour mieux apprécier l'effet
+      duration: const Duration(milliseconds: 1800), // Durée totale de l'animation
     );
 
-    // Initialiser les positions des vagues espacées régulièrement
-    for (int i = 0; i < _waveCount; i++) {
-      _waveRadiuses.add(i * _waveInterval);
-    }
+    // Animation pour le cercle central (commence immédiatement, finit à 20% du temps total)
+    _centerCircleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.0, 0.2, curve: Curves.easeOut),
+      ),
+    );
+
+    // Animation pour le cercle intermédiaire (commence à 15%, finit à 50% du temps total)
+    _middleCircleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.15, 0.5, curve: Curves.easeOut),
+      ),
+    );
+
+    // Animation pour le cercle externe (commence à 40%, finit à 80% du temps total)
+    _outerCircleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: const Interval(0.4, 0.8, curve: Curves.easeOut),
+      ),
+    );
 
     // Démarrer l'animation en boucle
     _animationController.repeat();
@@ -53,9 +71,10 @@ class _StarterScreenState extends State<StarterScreen> with SingleTickerProvider
             builder: (context, child) {
               return CustomPaint(
                 size: Size(screenSize.width, screenSize.height),
-                painter: RadarPulseCirclesPainter(
-                  animationValue: _animationController.value,
-                  waveRadiuses: _waveRadiuses,
+                painter: PulseCirclesPainter(
+                  centerProgress: _centerCircleAnimation.value,
+                  middleProgress: _middleCircleAnimation.value,
+                  outerProgress: _outerCircleAnimation.value,
                 ),
               );
             },
@@ -63,49 +82,30 @@ class _StarterScreenState extends State<StarterScreen> with SingleTickerProvider
 
           // Cercle central avec icône
           Center(
-            child: AnimatedBuilder(
-              animation: _animationController,
-              builder: (context, child) {
-                // Animation de pulsation pour le cercle central
-                final pulseFactor = 1.0 + 0.05 * math.sin(_animationController.value * 2 * math.pi);
-                
-                return Container(
-                  width: 140 * pulseFactor,
-                  height: 140 * pulseFactor,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Color.lerp(
-                        const Color(0xFF56FF6B).withOpacity(0.3),
-                        const Color(0xFF56FF6B).withOpacity(0.8),
-                        math.sin(_animationController.value * 2 * math.pi) * 0.5 + 0.5,
-                      )!,
-                      width: 2.0,
-                    ),
-                    gradient: RadialGradient(
-                      colors: [
-                        Colors.white.withOpacity(0.5 * (math.sin(_animationController.value * 2 * math.pi) * 0.3 + 0.7)),
-                        const Color(0xFF1E3A5F).withOpacity(0.3),
-                      ],
-                      stops: const [0.1, 1.0],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF56FF6B).withOpacity(0.3 * (math.sin(_animationController.value * 2 * math.pi) * 0.5 + 0.5)),
-                        blurRadius: 15,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.send,
-                      color: Colors.white.withOpacity(0.7 + 0.3 * math.sin(_animationController.value * 2 * math.pi)),
-                      size: 36,
-                    ),
-                  ),
-                );
-              },
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF56FF6B).withOpacity(0.4),
+                  width: 1.8,
+                ),
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.white.withOpacity(0.5),
+                    const Color(0xFF1E3A5F).withOpacity(0.3),
+                  ],
+                  stops: const [0.1, 1.0],
+                ),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.send,
+                  color: Colors.white,
+                  size: 36,
+                ),
+              ),
             ),
           ),
         ],
@@ -114,14 +114,16 @@ class _StarterScreenState extends State<StarterScreen> with SingleTickerProvider
   }
 }
 
-// Custom painter pour dessiner l'effet radar amélioré
-class RadarPulseCirclesPainter extends CustomPainter {
-  final double animationValue;
-  final List<double> waveRadiuses;
+// Custom painter pour dessiner les cercles concentriques avec animation de pulsation
+class PulseCirclesPainter extends CustomPainter {
+  final double centerProgress;
+  final double middleProgress;
+  final double outerProgress;
 
-  RadarPulseCirclesPainter({
-    required this.animationValue,
-    required this.waveRadiuses,
+  PulseCirclesPainter({
+    required this.centerProgress,
+    required this.middleProgress,
+    required this.outerProgress,
   });
 
   @override
@@ -131,152 +133,79 @@ class RadarPulseCirclesPainter extends CustomPainter {
 
     // Couleurs
     final blueColor = Color(0xFF1E3A5F);
-    final accentColor = Color(0xFF56FF6B);
+    final borderColorMiddle = Color(0xFF1E3A5F).withOpacity(0.4);
+    final borderColorOuter = Color(0xFF1E3A5F).withOpacity(0.25);
+    final accentColor = Color(0xFF56FF6B).withOpacity(0.3); // Couleur verte pour les pulsations
 
-    // Rayons de base des cercles
-    final baseCenterRadius = 70.0;
+    // Rayon de base du cercle central et variation pour l'animation
+    final baseCenterRadius = 80.0;
+    final centerPulseRadius = baseCenterRadius * (1 + centerProgress * 0.05);
+
+    // Rayon de base du cercle intermédiaire et variation pour l'animation
     final baseMiddleRadius = 160.0;
+    final middlePulseRadius = baseMiddleRadius * (1 + middleProgress * 0.08);
+
+    // Rayon de base du cercle externe et variation pour l'animation
     final baseOuterRadius = size.width * 0.65;
+    final outerPulseRadius = baseOuterRadius * (1 + outerProgress * 0.1);
 
-    // Rayon maximal des vagues
-    final maxWaveRadius = baseOuterRadius * 1.2;
-    
-    // Facteur d'apparition des cercles fixes (cercle moyen et grand cercle)
-    // Ils apparaissent progressivement pendant la première moitié de l'animation
-    final middleCircleOpacity = math.min(1.0, animationValue * 3); // Apparaît sur le premier tiers
-    final outerCircleOpacity = math.min(1.0, math.max(0, (animationValue * 3) - 1)); // Apparaît sur le deuxième tiers
-
-    // Animation d'échelle pour les cercles fixes
-    final middleCircleScale = math.min(1.0, animationValue * 5); // Grandit plus rapidement
-    final outerCircleScale = math.min(1.0, math.max(0, (animationValue * 4) - 0.5)); // Commence un peu plus tard
-    
-    final currentMiddleRadius = baseMiddleRadius * middleCircleScale;
-    final currentOuterRadius = baseOuterRadius * outerCircleScale;
-
-    // Dessiner les cercles externes avec animation d'apparition
-    
-    // Dessiner le cercle externe avec opacité progressive
-    if (outerCircleOpacity > 0) {
-      // Effet de respiration sur le cercle externe
-      final outerBreathEffect = 1.0 + 0.03 * math.sin(animationValue * 2 * math.pi);
-      
-      final paintOuter = Paint()
-        ..color = blueColor.withOpacity(0.1 * outerCircleOpacity)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(centerX, centerY), currentOuterRadius * outerBreathEffect, paintOuter);
-      
-      // Bordure du cercle externe avec glow
-      final paintOuterBorder = Paint()
-        ..color = blueColor.withOpacity(0.25 * outerCircleOpacity)
+    // Effet de pulse pour le cercle central
+    if (centerProgress > 0) {
+      final pulsePaint = Paint()
+        ..color = accentColor.withOpacity((1 - centerProgress) * 0.6)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
-      canvas.drawCircle(Offset(centerX, centerY), currentOuterRadius * outerBreathEffect, paintOuterBorder);
-      
-      // Ajouter un effet de glow pendant l'apparition
-      if (outerCircleOpacity < 1.0) {
-        final glowPaint = Paint()
-          ..color = accentColor.withOpacity(0.15 * (1 - outerCircleOpacity))
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 8);
-        canvas.drawCircle(Offset(centerX, centerY), currentOuterRadius * outerBreathEffect, glowPaint);
-      }
+        ..strokeWidth = 8 * centerProgress;
+      canvas.drawCircle(Offset(centerX, centerY), centerPulseRadius, pulsePaint);
     }
 
-    // Dessiner le cercle intermédiaire avec opacité progressive
-    if (middleCircleOpacity > 0) {
-      // Effet de respiration sur le cercle moyen (décalé par rapport au cercle externe)
-      final middleBreathEffect = 1.0 + 0.04 * math.sin((animationValue + 0.3) * 2 * math.pi);
-      
-      final paintMiddle = Paint()
-        ..color = blueColor.withOpacity(0.2 * middleCircleOpacity)
-        ..style = PaintingStyle.fill;
-      canvas.drawCircle(Offset(centerX, centerY), currentMiddleRadius * middleBreathEffect, paintMiddle);
-      
-      // Bordure du cercle intermédiaire
-      final paintMiddleBorder = Paint()
-        ..color = blueColor.withOpacity(0.4 * middleCircleOpacity)
+    // Cercle externe - grand pour dépasser partiellement l'écran
+    final paintOuter = Paint()
+      ..color = blueColor.withOpacity(0.1)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, centerY), baseOuterRadius, paintOuter);
+
+    // Bordure du cercle externe
+    final paintOuterBorder = Paint()
+      ..color = borderColorOuter
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(Offset(centerX, centerY), baseOuterRadius, paintOuterBorder);
+
+    // Effet de pulse pour le cercle externe
+    if (outerProgress > 0) {
+      final pulsePaint = Paint()
+        ..color = accentColor.withOpacity((1 - outerProgress) * 0.3)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.5;
-      canvas.drawCircle(Offset(centerX, centerY), currentMiddleRadius * middleBreathEffect, paintMiddleBorder);
-      
-      // Ajouter un effet de glow pendant l'apparition
-      if (middleCircleOpacity < 1.0) {
-        final glowPaint = Paint()
-          ..color = accentColor.withOpacity(0.2 * (1 - middleCircleOpacity))
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.5
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 6);
-        canvas.drawCircle(Offset(centerX, centerY), currentMiddleRadius * middleBreathEffect, glowPaint);
-      }
+        ..strokeWidth = 8 * outerProgress;
+      canvas.drawCircle(Offset(centerX, centerY), outerPulseRadius, pulsePaint);
     }
-    
-    // Dessiner chaque vague d'animation
-    for (int i = 0; i < waveRadiuses.length; i++) {
-      // Calculer la position normalisée de cette vague (entre 0 et 1)
-      double normalizedPosition = (animationValue + (i * 1.0 / waveRadiuses.length)) % 1.0;
-      
-      // Calculer le rayon actuel de la vague
-      double currentRadius = baseCenterRadius + (maxWaveRadius - baseCenterRadius) * normalizedPosition;
-      
-      // Calculer l'opacité de la vague (diminue à mesure qu'elle s'éloigne)
-      double waveOpacity = math.max(0, 0.9 - normalizedPosition * 0.9);
-      
-      // Variation de l'intensité entre les vagues
-      double intensityVariation = 0.7 + 0.3 * math.sin(i * math.pi / waveRadiuses.length);
-      
-      // Calculer la largeur de la vague (plus fine au début, plus large à mesure qu'elle s'éloigne)
-      double strokeWidth = 1.5 + normalizedPosition * 4;
-      
-      // Dessiner la vague principale
-      final wavePaint = Paint()
-        ..color = accentColor.withOpacity(waveOpacity * 0.5 * intensityVariation)
+
+    // Cercle intermédiaire
+    final paintMiddle = Paint()
+      ..color = blueColor.withOpacity(0.2)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, centerY), baseMiddleRadius, paintMiddle);
+
+    // Bordure du cercle intermédiaire
+    final paintMiddleBorder = Paint()
+      ..color = borderColorMiddle
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(Offset(centerX, centerY), baseMiddleRadius, paintMiddleBorder);
+
+    // Effet de pulse pour le cercle intermédiaire
+    if (middleProgress > 0) {
+      final pulsePaint = Paint()
+        ..color = accentColor.withOpacity((1 - middleProgress) * 0.4)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 + normalizedPosition * 4);
-      
-      canvas.drawCircle(Offset(centerX, centerY), currentRadius, wavePaint);
-      
-      // Dessiner une vague secondaire légèrement décalée pour un effet de profondeur
-      final secondaryWavePaint = Paint()
-        ..color = accentColor.withOpacity(waveOpacity * 0.25 * intensityVariation)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth * 1.5
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, 5 + normalizedPosition * 5);
-      
-      canvas.drawCircle(Offset(centerX, centerY), currentRadius - 2, secondaryWavePaint);
-      
-      // Ajouter un effet de "flash" lorsque l'onde atteint les cercles moyen et externe
-      if (currentMiddleRadius > 0 && (currentRadius - currentMiddleRadius).abs() < 15) {
-        double flashIntensity = 1.0 - ((currentRadius - currentMiddleRadius).abs() / 15);
-        final flashPaint = Paint()
-          ..color = accentColor.withOpacity(0.3 * flashIntensity * middleCircleOpacity)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.5
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 4);
-        canvas.drawCircle(Offset(centerX, centerY), currentMiddleRadius, flashPaint);
-      }
-      
-      if (currentOuterRadius > 0 && (currentRadius - currentOuterRadius).abs() < 20) {
-        double flashIntensity = 1.0 - ((currentRadius - currentOuterRadius).abs() / 20);
-        final flashPaint = Paint()
-          ..color = accentColor.withOpacity(0.25 * flashIntensity * outerCircleOpacity)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 5);
-        canvas.drawCircle(Offset(centerX, centerY), currentOuterRadius, flashPaint);
-      }
+        ..strokeWidth = 8 * middleProgress;
+      canvas.drawCircle(Offset(centerX, centerY), middlePulseRadius, pulsePaint);
     }
-    
-    // Ajouter un léger glow constant au centre
-    final centerGlowPaint = Paint()
-      ..color = accentColor.withOpacity(0.15 + 0.1 * math.sin(animationValue * 2 * math.pi))
-      ..style = PaintingStyle.fill
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 20);
-    canvas.drawCircle(Offset(centerX, centerY), baseCenterRadius * 0.8, centerGlowPaint);
   }
 
   @override
-  bool shouldRepaint(covariant RadarPulseCirclesPainter oldDelegate) =>
-      oldDelegate.animationValue != animationValue;
+  bool shouldRepaint(covariant PulseCirclesPainter oldDelegate) =>
+      oldDelegate.centerProgress != centerProgress ||
+      oldDelegate.middleProgress != middleProgress ||
+      oldDelegate.outerProgress != outerProgress;
 }
